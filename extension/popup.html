@@ -7,7 +7,76 @@
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <div id="app"></div>
+  <div id="app">
+    <!-- Header -->
+    <div class="header">
+      <span class="header-icon">📅</span>
+      <span class="header-title">Calendur</span>
+    </div>
+
+    <!-- Error banner (shown in any state) -->
+    <div id="error-banner" class="error-banner">
+      <div id="error-text" class="error-text"></div>
+      <button id="error-retry" class="error-retry">Try again</button>
+    </div>
+
+    <!-- State 1: Input -->
+    <div id="state-input" class="state active">
+      <textarea id="event-text" placeholder="e.g. Lunch with Sarah tomorrow at noon at Blue Bottle Coffee for 1.5 hours"></textarea>
+      <button id="btn-parse" class="btn btn-primary">Parse Event →</button>
+      <div class="settings-link">
+        <a id="open-settings">⚙ Settings</a>
+      </div>
+    </div>
+
+    <!-- State 2: Preview -->
+    <div id="state-preview" class="state">
+      <div class="field">
+        <div class="field-label">Title</div>
+        <input type="text" id="preview-title">
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <div class="field-label">Date</div>
+          <input type="date" id="preview-date">
+        </div>
+        <div class="field">
+          <div class="field-label">Time</div>
+          <input type="text" id="preview-time" placeholder="12:00 – 1:30 PM">
+        </div>
+      </div>
+      <div class="field" id="location-field">
+        <div class="field-label">Location</div>
+        <input type="text" id="preview-location">
+      </div>
+      <div class="field" id="recurrence-field" style="display:none;">
+        <div class="field-label">Recurrence</div>
+        <div class="field-recurrence" id="preview-recurrence"></div>
+      </div>
+      <div class="field">
+        <div class="field-label">Calendar</div>
+        <select id="preview-calendar">
+          <option value="primary">Primary</option>
+        </select>
+      </div>
+      <div class="btn-row">
+        <button id="btn-back" class="btn btn-ghost">← Back</button>
+        <button id="btn-create" class="btn btn-success">Create Event ✓</button>
+      </div>
+    </div>
+
+    <!-- State 3: Confirmation -->
+    <div id="state-confirm" class="state">
+      <div class="confirmation">
+        <div class="confirmation-icon">✅</div>
+        <div class="confirmation-title">Event Created!</div>
+        <div class="confirmation-detail" id="confirm-title"></div>
+        <div class="confirmation-detail" id="confirm-datetime"></div>
+        <a id="confirm-link" class="confirmation-link" target="_blank">Open in Google Calendar →</a>
+        <button id="btn-another" class="btn btn-ghost" style="margin-top:1rem;">Add Another</button>
+      </div>
+    </div>
+  </div>
   <script src="popup.js"></script>
 </body>
 </html>
