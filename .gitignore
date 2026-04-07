@@ -8,3 +8,4 @@ docs/
 .conductor/
 .vercel/
 *.log
+.vercel
