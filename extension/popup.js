@@ -45,7 +45,7 @@ async function getSettings() {
   return new Promise(resolve => {
     chrome.storage.sync.get(
       {
-        backendUrl: 'http://localhost:3000',
+        backendUrl: 'https://colombo-omega.vercel.app',
         defaultCalendarId: 'primary',
         defaultDuration: 30,
         defaultReminders: [{ method: 'popup', minutes: 10 }],
