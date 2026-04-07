@@ -76,7 +76,7 @@ async function parseEvent() {
       body: JSON.stringify({
         text,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        currentDate: new Date().toISOString(),
+        currentDate: new Date().toLocaleString('sv-SE', { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone }).replace(' ', 'T'),
         defaultDuration: settings.defaultDuration,
       }),
     });
