@@ -335,16 +335,6 @@ document.getElementById('btn-another').addEventListener('click', () => {
   showState('input');
 });
 
-// ---- Debug: show redirect URI (TEMP) ----
-chrome.runtime.sendMessage({ type: 'getRedirectURI' }, (res) => {
-  if (res && res.uri) {
-    const el = document.createElement('div');
-    el.style.cssText = 'background:#333;color:#0f0;padding:8px;font-size:11px;word-break:break-all;margin-bottom:8px;border-radius:4px;';
-    el.textContent = 'Redirect URI: ' + res.uri;
-    document.getElementById('app').prepend(el);
-  }
-});
-
 // ---- Settings ----
 
 document.getElementById('open-settings').addEventListener('click', () => {
