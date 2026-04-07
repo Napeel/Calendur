@@ -17,7 +17,7 @@
     "service_worker": "background.js"
   },
   "oauth2": {
-    "client_id": "PLACEHOLDER.apps.googleusercontent.com",
+    "client_id": "850989563114-jcrd2gka83836rkbjbpk99dlnrq636lu.apps.googleusercontent.com",
     "scopes": [
       "https://www.googleapis.com/auth/calendar",
       "https://www.googleapis.com/auth/userinfo.email"

@@ -213,11 +213,11 @@ async function loadCalendars() {
 
 function getAuthToken() {
   return new Promise((resolve) => {
-    chrome.identity.getAuthToken({ interactive: true }, (token) => {
-      if (chrome.runtime.lastError) {
-        resolve(null);
+    chrome.runtime.sendMessage({ type: 'getAuthToken', interactive: true }, (response) => {
+      if (response && response.token) {
+        resolve(response.token);
       } else {
-        resolve(token);
+        resolve(null);
       }
     });
   });
