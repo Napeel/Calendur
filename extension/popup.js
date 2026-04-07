@@ -176,7 +176,7 @@ function rruleToHuman(rrule) {
 
 async function loadCalendars() {
   try {
-    const token = await getAuthToken();
+    const token = await getAuthToken(false);
     if (!token) return;
 
     const res = await fetch('https://www.googleapis.com/calendar/v3/users/me/calendarList', {
@@ -202,9 +202,9 @@ async function loadCalendars() {
 
 // ---- Auth ----
 
-function getAuthToken() {
+function getAuthToken(interactive = true) {
   return new Promise((resolve) => {
-    chrome.runtime.sendMessage({ type: 'getAuthToken', interactive: true }, (response) => {
+    chrome.runtime.sendMessage({ type: 'getAuthToken', interactive }, (response) => {
       if (response && response.token) {
         resolve(response.token);
       } else {
