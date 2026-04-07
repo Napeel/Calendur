@@ -1,0 +1,1 @@
+/Users/nabilmuzafar/Documents/GitHub/Calendur/calendur/.claude/skills/gstack/ship/SKILL.md
