@@ -33,16 +33,18 @@ Supports recurring events (`"weekly standup every Monday at 10am"`) and timezone
 
 1. Create a project at [console.cloud.google.com](https://console.cloud.google.com)
 2. Enable the **Google Calendar API**
-3. Go to **Credentials** → Create **OAuth 2.0 Client ID** (type: Chrome Extension)
+3. Go to **Credentials** → Create **OAuth 2.0 Client ID** (type: **Web application**)
 4. Copy the client ID
 
 ### 2. Extension
 
-1. Open `extension/manifest.json` and replace `PLACEHOLDER.apps.googleusercontent.com` with your client ID
+1. Open `extension/manifest.json` and replace `YOUR_CLIENT_ID.apps.googleusercontent.com` with your client ID
 2. Go to `chrome://extensions` (or `brave://extensions`)
 3. Enable **Developer mode**
 4. Click **Load unpacked** → select the `extension/` folder
-5. Copy the extension ID from the extensions page and add it to your OAuth client's authorized origins in Google Cloud Console
+5. Copy the extension ID from the extensions page
+6. Back in Google Cloud Console, add `https://<extension-id>.chromiumapp.org/` as an **Authorized redirect URI** on your OAuth client
+7. Add your Google account email as a **Test user** in the OAuth consent screen
 
 ### 3. Backend
 

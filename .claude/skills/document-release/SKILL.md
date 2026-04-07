@@ -1,1 +1,0 @@
-/Users/nabilmuzafar/Documents/GitHub/Calendur/calendur/.claude/skills/gstack/document-release/SKILL.md

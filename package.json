@@ -2,7 +2,11 @@
   "name": "calendur",
   "version": "0.1.0",
   "description": "Chrome extension that creates Google Calendar events from plain text using Claude AI",
-  "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Napeel/calendur.git"
+  },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0"
   }
