@@ -97,6 +97,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const res = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
           headers: { Authorization: `Bearer ${token}` },
         });
+        if (res.status === 401) {
+          // Token expired — clear it so user can re-authenticate
+          cachedToken = null;
+          chrome.storage.local.remove('authToken');
+          sendResponse({ error: 'Token expired' });
+          return;
+        }
         const info = await res.json();
         sendResponse({ email: info.email, name: info.name });
       } catch (err) {
