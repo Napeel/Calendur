@@ -1,5 +1,5 @@
 // Background service worker for Calendur
-// Uses launchWebAuthFlow for OAuth (works with unpacked extensions in Brave/Chrome)
+// Uses authorization code flow with refresh tokens for persistent auth
 
 const REDIRECT_URI = chrome.identity.getRedirectURL();
 const SCOPES = [
@@ -7,104 +7,176 @@ const SCOPES = [
   'https://www.googleapis.com/auth/userinfo.email',
 ].join(' ');
 
-let cachedToken = null;
-let cachedTokenExpiresAt = null;
+let cachedAccessToken = null;
+let cachedAccessTokenExpiresAt = null;
+let cachedRefreshToken = null;
 let refreshPromise = null;
 
-// Restore token from storage on service worker startup
-chrome.storage.local.get(['authToken', 'authTokenExpiresAt'], (result) => {
-  if (result.authToken) {
-    cachedToken = result.authToken;
-    cachedTokenExpiresAt = result.authTokenExpiresAt || null;
+// Restore tokens from storage on service worker startup
+chrome.storage.local.get(
+  ['accessToken', 'accessTokenExpiresAt', 'refreshToken', 'authToken'],
+  (result) => {
+    // Migrate from old implicit flow storage keys
+    if (result.authToken && !result.accessToken) {
+      chrome.storage.local.remove(['authToken', 'authTokenExpiresAt']);
+      return;
+    }
+    if (result.accessToken) {
+      cachedAccessToken = result.accessToken;
+      cachedAccessTokenExpiresAt = result.accessTokenExpiresAt || null;
+    }
+    if (result.refreshToken) {
+      cachedRefreshToken = result.refreshToken;
+    }
   }
-});
+);
 
 function getClientId() {
   return chrome.runtime.getManifest().oauth2.client_id;
 }
 
-function extractTokenData(redirectUrl) {
-  const url = new URL(redirectUrl);
-  const hash = url.hash.substring(1);
-  const params = new URLSearchParams(hash);
-  return {
-    token: params.get('access_token'),
-    expiresIn: parseInt(params.get('expires_in')) || 3600,
-  };
-}
-
-function saveToken(token, expiresInSeconds = 3600) {
-  const expiresAt = Date.now() + expiresInSeconds * 1000;
-  cachedToken = token;
-  cachedTokenExpiresAt = expiresAt;
-  chrome.storage.local.set({ authToken: token, authTokenExpiresAt: expiresAt });
-}
-
-function clearToken() {
-  cachedToken = null;
-  cachedTokenExpiresAt = null;
-  chrome.storage.local.remove(['authToken', 'authTokenExpiresAt']);
+async function getBackendUrl() {
+  const { backendUrl } = await chrome.storage.sync.get({ backendUrl: '' });
+  return backendUrl;
 }
 
 function isTokenFresh() {
-  // Consider token expired if within 60s of expiry or no expiry info
-  if (!cachedToken) return false;
-  if (!cachedTokenExpiresAt) return false;
-  return Date.now() < cachedTokenExpiresAt - 60000;
+  if (!cachedAccessToken || !cachedAccessTokenExpiresAt) return false;
+  return Date.now() < cachedAccessTokenExpiresAt - 60000;
 }
 
-// Get a valid token — restores from storage, checks expiry, re-auths if needed
-async function getValidToken(interactive) {
-  // Deduplicate concurrent refresh attempts
-  if (refreshPromise) return refreshPromise;
-
-  // Fast path: in-memory token is still fresh
-  if (cachedToken && isTokenFresh()) return cachedToken;
-
-  // Check storage in case service worker restarted
-  const stored = await chrome.storage.local.get(['authToken', 'authTokenExpiresAt']);
-  if (stored.authToken) {
-    cachedToken = stored.authToken;
-    cachedTokenExpiresAt = stored.authTokenExpiresAt || null;
-    if (isTokenFresh()) return cachedToken;
+function saveTokens(accessToken, expiresIn, refreshToken) {
+  const expiresAt = Date.now() + expiresIn * 1000;
+  cachedAccessToken = accessToken;
+  cachedAccessTokenExpiresAt = expiresAt;
+  const data = { accessToken, accessTokenExpiresAt: expiresAt };
+  if (refreshToken) {
+    cachedRefreshToken = refreshToken;
+    data.refreshToken = refreshToken;
   }
+  chrome.storage.local.set(data);
+}
 
-  // Token is missing or expired — need to re-authenticate
-  clearToken();
+function clearTokens() {
+  cachedAccessToken = null;
+  cachedAccessTokenExpiresAt = null;
+  cachedRefreshToken = null;
+  chrome.storage.local.remove(['accessToken', 'accessTokenExpiresAt', 'refreshToken']);
+}
 
-  if (!interactive) return null;
+function extractAuthCode(redirectUrl) {
+  const url = new URL(redirectUrl);
+  return url.searchParams.get('code');
+}
 
-  // Interactive re-auth (shows Google login popup)
-  refreshPromise = new Promise((resolve, reject) => {
-    const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-    authUrl.searchParams.set('client_id', getClientId());
-    authUrl.searchParams.set('redirect_uri', REDIRECT_URI);
-    authUrl.searchParams.set('response_type', 'token');
-    authUrl.searchParams.set('scope', SCOPES);
-    authUrl.searchParams.set('prompt', 'consent');
+async function exchangeCodeForTokens(code) {
+  const backendUrl = await getBackendUrl();
+  if (!backendUrl) throw new Error('Backend URL not configured. Set it in Settings.');
+  const res = await fetch(`${backendUrl}/api/auth/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code, redirect_uri: REDIRECT_URI }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Token exchange failed (${res.status})`);
+  }
+  return res.json();
+}
 
+async function refreshAccessToken() {
+  const backendUrl = await getBackendUrl();
+  if (!backendUrl) throw new Error('Backend URL not configured. Set it in Settings.');
+  const res = await fetch(`${backendUrl}/api/auth/refresh`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh_token: cachedRefreshToken }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    if (res.status === 400 || res.status === 401) {
+      clearTokens(); // Refresh token revoked/invalid
+    }
+    throw new Error(err.error || `Token refresh failed (${res.status})`);
+  }
+  return res.json();
+}
+
+async function doInteractiveAuth() {
+  const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+  authUrl.searchParams.set('client_id', getClientId());
+  authUrl.searchParams.set('redirect_uri', REDIRECT_URI);
+  authUrl.searchParams.set('response_type', 'code');
+  authUrl.searchParams.set('scope', SCOPES);
+  authUrl.searchParams.set('access_type', 'offline');
+  authUrl.searchParams.set('prompt', 'consent');
+
+  return new Promise((resolve, reject) => {
     chrome.identity.launchWebAuthFlow(
       { url: authUrl.toString(), interactive: true },
-      (redirectUrl) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-          return;
-        }
-        if (!redirectUrl) {
-          reject(new Error('No redirect URL received'));
-          return;
-        }
-        const { token, expiresIn } = extractTokenData(redirectUrl);
-        if (token) {
-          saveToken(token, expiresIn);
-          resolve(token);
-        } else {
-          reject(new Error('No access token in response'));
+      async (redirectUrl) => {
+        try {
+          if (chrome.runtime.lastError) {
+            throw new Error(chrome.runtime.lastError.message);
+          }
+          if (!redirectUrl) {
+            throw new Error('No redirect URL received');
+          }
+          const code = extractAuthCode(redirectUrl);
+          if (!code) {
+            throw new Error('No authorization code in response');
+          }
+          const data = await exchangeCodeForTokens(code);
+          saveTokens(data.access_token, data.expires_in, data.refresh_token);
+          resolve(cachedAccessToken);
+        } catch (err) {
+          reject(err);
         }
       }
     );
-  }).finally(() => { refreshPromise = null; });
+  });
+}
 
+async function getValidToken(interactive) {
+  if (refreshPromise) return refreshPromise;
+
+  // Fast path: in-memory token is fresh
+  if (cachedAccessToken && isTokenFresh()) return cachedAccessToken;
+
+  // Check storage (service worker may have restarted)
+  const stored = await chrome.storage.local.get([
+    'accessToken', 'accessTokenExpiresAt', 'refreshToken',
+  ]);
+  if (stored.accessToken) {
+    cachedAccessToken = stored.accessToken;
+    cachedAccessTokenExpiresAt = stored.accessTokenExpiresAt || null;
+    cachedRefreshToken = stored.refreshToken || cachedRefreshToken;
+    if (isTokenFresh()) return cachedAccessToken;
+  }
+
+  // Silent refresh if we have a refresh token
+  if (cachedRefreshToken) {
+    refreshPromise = (async () => {
+      try {
+        const data = await refreshAccessToken();
+        saveTokens(data.access_token, data.expires_in);
+        return cachedAccessToken;
+      } catch {
+        // Refresh failed — fall through to interactive if allowed
+        if (!cachedRefreshToken && interactive) {
+          return doInteractiveAuth();
+        }
+        if (!interactive) return null;
+        throw new Error('Token refresh failed. Try reconnecting in Settings.');
+      }
+    })().finally(() => { refreshPromise = null; });
+    return refreshPromise;
+  }
+
+  // No refresh token — need interactive auth
+  if (!interactive) return null;
+
+  refreshPromise = doInteractiveAuth().finally(() => { refreshPromise = null; });
   return refreshPromise;
 }
 
@@ -117,7 +189,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === 'removeCachedToken') {
-    clearToken();
+    clearTokens();
     sendResponse({ success: true });
     return true;
   }
@@ -134,7 +206,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.status === 401) {
-          clearToken();
+          clearTokens();
           sendResponse({ error: 'Token expired' });
           return;
         }

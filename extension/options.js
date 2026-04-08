@@ -130,14 +130,22 @@ document.getElementById('btn-connect').addEventListener('click', async () => {
 });
 
 document.getElementById('btn-disconnect').addEventListener('click', async () => {
+  // Revoke token with Google (best effort)
   const tokenResponse = await new Promise(resolve => {
     chrome.runtime.sendMessage({ type: 'getAuthToken', interactive: false }, resolve);
   });
   if (tokenResponse && tokenResponse.token) {
-    await new Promise(resolve => {
-      chrome.runtime.sendMessage({ type: 'removeCachedToken', token: tokenResponse.token }, resolve);
-    });
+    try {
+      await fetch(`https://oauth2.googleapis.com/revoke?token=${tokenResponse.token}`, {
+        method: 'POST',
+      });
+    } catch {
+      // Revocation is best-effort
+    }
   }
+  await new Promise(resolve => {
+    chrome.runtime.sendMessage({ type: 'removeCachedToken' }, resolve);
+  });
   checkAccount();
 });
 

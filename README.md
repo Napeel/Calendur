@@ -58,8 +58,10 @@ Deploy to Vercel:
 vercel --prod
 ```
 
-Set the environment variable in Vercel dashboard:
+Set the environment variables in Vercel dashboard:
 - `ANTHROPIC_API_KEY` — your Anthropic API key
+- `GOOGLE_CLIENT_ID` — your Google OAuth client ID (same as in manifest.json)
+- `GOOGLE_CLIENT_SECRET` — your Google OAuth client secret (from Google Cloud Console → Credentials → your OAuth client)
 
 ### 4. Configure
 
