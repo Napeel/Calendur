@@ -163,11 +163,8 @@ async function getValidToken(interactive) {
         return cachedAccessToken;
       } catch {
         // Refresh failed — fall through to interactive if allowed
-        if (!cachedRefreshToken && interactive) {
-          return doInteractiveAuth();
-        }
         if (!interactive) return null;
-        throw new Error('Token refresh failed. Try reconnecting in Settings.');
+        return doInteractiveAuth();
       }
     })().finally(() => { refreshPromise = null; });
     return refreshPromise;
