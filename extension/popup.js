@@ -205,6 +205,10 @@ async function loadCalendars() {
 function getAuthToken(interactive = true) {
   return new Promise((resolve) => {
     chrome.runtime.sendMessage({ type: 'getAuthToken', interactive }, (response) => {
+      if (chrome.runtime.lastError) {
+        resolve(null);
+        return;
+      }
       if (response && response.token) {
         resolve(response.token);
       } else {
@@ -237,8 +241,15 @@ async function createEvent() {
 
     // Build start/end from edited pickers
     const dateVal = previewDate.value;
-    const startISO = `${dateVal}T${previewStartTime.value}:00`;
-    const endISO = `${dateVal}T${previewEndTime.value}:00`;
+    const startTimeVal = previewStartTime.value;
+    const endTimeVal = previewEndTime.value;
+
+    if (!dateVal || !startTimeVal || !endTimeVal) {
+      throw new Error('Date, start time, and end time are all required.');
+    }
+
+    const startISO = `${dateVal}T${startTimeVal}:00`;
+    const endISO = `${dateVal}T${endTimeVal}:00`;
 
     const eventBody = {
       summary: previewTitle.value,

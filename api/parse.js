@@ -55,10 +55,18 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
+  if (!req.body || typeof req.body !== "object") {
+    return res.status(400).json({ error: "Request body must be JSON" });
+  }
+
   const { text, timezone, currentDate, defaultDuration } = req.body;
 
   if (!text) {
     return res.status(400).json({ error: "Missing required field: text" });
+  }
+
+  if (typeof text !== "string" || text.length > 2000) {
+    return res.status(400).json({ error: "text must be a string under 2000 characters" });
   }
 
   const userPrompt = `Parse this event description:
@@ -94,8 +102,9 @@ Context:
         .status(500)
         .json({ error: "Failed to parse Claude response as JSON" });
     }
-    return res
-      .status(500)
-      .json({ error: error.message || "Internal server error" });
+    const isProviderError = error?.status !== undefined || error?.error !== undefined;
+    return res.status(500).json({
+      error: isProviderError ? "AI service error. Try again later." : (error.message || "Internal server error"),
+    });
   }
 }
